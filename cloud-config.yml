@@ -1,0 +1,68 @@
+#cloud-config
+users:
+  - name: kitura
+    groups: sudo
+    shell: /bin/bash
+    sudo: ['ALL=(ALL) NOPASSWD:ALL']
+    ssh-authorized-keys:
+      - INSERT_KEY
+
+packages:
+  - autoconf
+  - libtool
+  - pkg-config
+  - libhttp-parser-dev
+  - libcurl4-openssl-dev
+  - libhiredis-dev
+  - libblocksruntime-dev
+  - libkqueue-dev
+  - libpthread-workqueue-dev
+  - libbsd-dev
+  - git
+  - clang
+  - libicu-dev
+  - curl
+
+write_files:
+  - path: /etc/iptables/rules.v4
+    permissions: 0644
+    owner: 'root:root'
+    content: |
+      *filter
+      :INPUT DROP [0:0]
+      :FORWARD DROP [0:0]
+      :OUTPUT ACCEPT [0:0]
+      -A INPUT -i lo -j ACCEPT
+      -A INPUT -i eth1 -j ACCEPT
+      -A INPUT -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+      -A INPUT -p tcp -m tcp --dport 8090 -j ACCEPT
+      COMMIT
+  - path: /etc/network/if-pre-up.d/iptablesload
+    permissions: 0755
+    content: |
+      #!/bin/sh
+      iptables-restore < /etc/iptables/rules.v4
+      exit 0
+  - path: /tmp/libdispatch_install
+    permissions: 0755
+    content: |
+      #!/bin/sh
+      cd /tmp/swift-corelibs-libdispatch
+      sh ./autogen.sh
+      ./configure
+      make
+      sudo make install
+
+runcmd:
+  - 'su -c "git clone -b opaque-pointer git://github.com/seabaylea/swift-corelibs-libdispatch /tmp/swift-corelibs-libdispatch" kitura'
+  - 'su -c "curl -O http://ftp.exim.org/pub/pcre/pcre2-10.20.tar.gz" kitura'
+  - 'su -c ". /tmp/libdispatch_install" kitura'
+  - 'su -c "curl -sSL https://swift.org/builds/development/ubuntu1510/swift-DEVELOPMENT-SNAPSHOT-2016-02-08-a/swift-DEVELOPMENT-SNAPSHOT-2016-02-08-a-ubuntu15.10.tar.gz" kitura'
+  - 'su -c "tar -xzvf swift-DEVELOPMENT-SNAPSHOT-2016-02-08-a-ubuntu15.10.tar.gz" kitura'
+  - 'su -c "ln -s swift-DEVELOPMENT-SNAPSHOT-2016-02-08-a-ubuntu15.10 swift" kitura'
+  - 'su -c "cat > /home/kitura/.bashrc <<EOL
+    export PATH=$HOME/swift/usr/bin:"${PATH}"
+    export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
+    EOL" kitura'
+  - mkdir /var/www
+  - chown kitura:kitura /var/www
