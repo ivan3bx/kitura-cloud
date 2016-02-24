@@ -5,7 +5,7 @@ users:
     shell: /bin/bash
     sudo: ['ALL=(ALL) NOPASSWD:ALL']
     ssh-authorized-keys:
-      - INSERT_KEY
+      - SSH_KEY
 
 packages:
   - autoconf
@@ -52,17 +52,32 @@ write_files:
       ./configure
       make
       sudo make install
+  - path: /tmp/pcre_install
+    permissions: 0755
+    content: |
+      #!/bin/sh
+      
+      cd /tmp/pcre2-10.20
+      ./configure
+      make
+      sudo make install
+  - path: /tmp/bashrc_template
+    permissions: 0644
+    content: |
+      export PATH=/usr/local/swift/usr/bin:"${PATH}"
+      export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
 
 runcmd:
   - 'su -c "git clone -b opaque-pointer git://github.com/seabaylea/swift-corelibs-libdispatch /tmp/swift-corelibs-libdispatch" kitura'
-  - 'su -c "curl -O http://ftp.exim.org/pub/pcre/pcre2-10.20.tar.gz" kitura'
   - 'su -c ". /tmp/libdispatch_install" kitura'
-  - 'su -c "curl -sSL https://swift.org/builds/development/ubuntu1510/swift-DEVELOPMENT-SNAPSHOT-2016-02-08-a/swift-DEVELOPMENT-SNAPSHOT-2016-02-08-a-ubuntu15.10.tar.gz" kitura'
-  - 'su -c "tar -xzvf swift-DEVELOPMENT-SNAPSHOT-2016-02-08-a-ubuntu15.10.tar.gz" kitura'
-  - 'su -c "ln -s swift-DEVELOPMENT-SNAPSHOT-2016-02-08-a-ubuntu15.10 swift" kitura'
-  - 'su -c "cat > /home/kitura/.bashrc <<EOL
-    export PATH=$HOME/swift/usr/bin:"${PATH}"
-    export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
-    EOL" kitura'
-  - mkdir /var/www
-  - chown kitura:kitura /var/www
+  - 'curl -sSL https://swift.org/builds/development/ubuntu1510/swift-DEVELOPMENT-SNAPSHOT-2016-02-08-a/swift-DEVELOPMENT-SNAPSHOT-2016-02-08-a-ubuntu15.10.tar.gz -o /tmp/swift-snapshot.tgz'
+  - 'tar -C /usr/local -zxf /tmp/swift-snapshot.tgz'
+  - 'chown -R kitura:kitura /usr/local/swift-DEVELOPMENT-SNAPSHOT-2016-02-08-a-ubuntu15.10'
+  - 'ln -s /usr/local/swift-DEVELOPMENT-SNAPSHOT-2016-02-08-a-ubuntu15.10 /usr/local/swift'
+  - 'su -c "cp /tmp/bashrc_template /home/kitura/.bashrc" kitura'
+  - 'curl -sSL http://ftp.exim.org/pub/pcre/pcre2-10.20.tar.gz -o /tmp/pcre2-10.20.tar.gz'
+  - 'su -c "tar -C /tmp -zxf /tmp/pcre2-10.20.tar.gz" kitura'
+  - 'su -c ". /tmp/pcre_install" kitura'
+  - 'su -c "git clone https://github.com/IBM-Swift/Kitura.git /home/kitura/Kitura" kitura'
+  - 'cd Kitura'
+  - 'sudo cp Sources/Modulemaps/module.modulemap /usr/local/include/dispatch/'
